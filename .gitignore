@@ -61,3 +61,6 @@ Thumbs.db
 
 # Node modules (if any scripts use Node.js)
 node_modules/
+
+# Claude Code guidance file
+CLAUDE.md
