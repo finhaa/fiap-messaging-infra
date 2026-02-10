@@ -59,7 +59,7 @@ resource "aws_cloudwatch_event_target" "to_os_service" {
 
   # Retry policy
   retry_policy {
-    maximum_event_age       = 3600  # 1 hour
+    maximum_event_age_in_seconds = 3600  # 1 hour
     maximum_retry_attempts  = 3
   }
 }
@@ -95,7 +95,7 @@ resource "aws_cloudwatch_event_target" "to_billing_service" {
   }
 
   retry_policy {
-    maximum_event_age      = 3600
+    maximum_event_age_in_seconds = 3600
     maximum_retry_attempts = 3
   }
 }
@@ -130,7 +130,7 @@ resource "aws_cloudwatch_event_target" "to_execution_service" {
   }
 
   retry_policy {
-    maximum_event_age      = 3600
+    maximum_event_age_in_seconds = 3600
     maximum_retry_attempts = 3
   }
 }
