@@ -13,6 +13,7 @@ variable "project_name" {
 variable "environment" {
   description = "Environment name (development, staging, production)"
   type        = string
+  default     = "development"
 
   validation {
     condition     = contains(["development", "staging", "production"], var.environment)
