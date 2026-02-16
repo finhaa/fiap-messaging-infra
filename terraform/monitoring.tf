@@ -196,60 +196,51 @@ resource "aws_cloudwatch_dashboard" "messaging" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type = "metric"
+        type   = "metric"
+        width  = 24
+        height = 6
         properties = {
           metrics = [
-            ["AWS/SQS", "NumberOfMessagesSent", { stat = "Sum", label = "OS Service Sent" }, { QueueName = aws_sqs_queue.os_service.name }],
-            [".", ".", { stat = "Sum", label = "Billing Service Sent" }, { QueueName = aws_sqs_queue.billing_service.name }],
-            [".", ".", { stat = "Sum", label = "Execution Service Sent" }, { QueueName = aws_sqs_queue.execution_service.name }]
+            ["AWS/SQS", "NumberOfMessagesSent", "QueueName", aws_sqs_queue.os_service.name],
+            ["AWS/SQS", "NumberOfMessagesSent", "QueueName", aws_sqs_queue.billing_service.name],
+            ["AWS/SQS", "NumberOfMessagesSent", "QueueName", aws_sqs_queue.execution_service.name]
           ]
           period = 300
           stat   = "Sum"
           region = var.aws_region
           title  = "Messages Sent to Queues"
-          yAxis = {
-            left = {
-              min = 0
-            }
-          }
         }
       },
       {
-        type = "metric"
+        type   = "metric"
+        width  = 24
+        height = 6
         properties = {
           metrics = [
-            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", { label = "OS Service Queue" }, { QueueName = aws_sqs_queue.os_service.name }],
-            [".", ".", { label = "Billing Service Queue" }, { QueueName = aws_sqs_queue.billing_service.name }],
-            [".", ".", { label = "Execution Service Queue" }, { QueueName = aws_sqs_queue.execution_service.name }]
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.os_service.name],
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.billing_service.name],
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.execution_service.name]
           ]
           period = 300
           stat   = "Average"
           region = var.aws_region
           title  = "Queue Depth (Messages Waiting)"
-          yAxis = {
-            left = {
-              min = 0
-            }
-          }
         }
       },
       {
-        type = "metric"
+        type   = "metric"
+        width  = 24
+        height = 6
         properties = {
           metrics = [
-            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", { label = "OS Service DLQ" }, { QueueName = aws_sqs_queue.os_service_dlq.name }],
-            [".", ".", { label = "Billing Service DLQ" }, { QueueName = aws_sqs_queue.billing_service_dlq.name }],
-            [".", ".", { label = "Execution Service DLQ" }, { QueueName = aws_sqs_queue.execution_service_dlq.name }]
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.os_service_dlq.name],
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.billing_service_dlq.name],
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.execution_service_dlq.name]
           ]
           period = 300
           stat   = "Sum"
           region = var.aws_region
           title  = "Dead Letter Queues (Failed Messages)"
-          yAxis = {
-            left = {
-              min = 0
-            }
-          }
         }
       }
     ]

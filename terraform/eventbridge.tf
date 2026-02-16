@@ -135,37 +135,6 @@ resource "aws_cloudwatch_event_target" "to_execution_service" {
   }
 }
 
-# Rule 4: Route saga-related events to Step Functions (saga orchestrator)
-# NOTE: This will be uncommented when saga-orchestrator-service is deployed
-# resource "aws_cloudwatch_event_rule" "to_saga_orchestrator" {
-#   name           = "route-to-saga-orchestrator-${var.environment}"
-#   description    = "Route saga-related events to Step Functions orchestrator"
-#   event_bus_name = aws_cloudwatch_event_bus.main.name
-#
-#   event_pattern = jsonencode({
-#     detail-type = [
-#       "BudgetApproved",
-#       "BudgetRejected",
-#       "PaymentCompleted",
-#       "PaymentFailed",
-#       "ExecutionScheduled",
-#       "ExecutionFailed"
-#     ]
-#   })
-#
-#   tags = merge(local.common_tags, {
-#     Name          = "route-to-saga-orchestrator-${var.environment}"
-#     TargetService = "saga-orchestrator"
-#   })
-# }
-#
-# resource "aws_cloudwatch_event_target" "to_saga_orchestrator" {
-#   rule           = aws_cloudwatch_event_rule.to_saga_orchestrator.name
-#   event_bus_name = aws_cloudwatch_event_bus.main.name
-#   arn            = data.aws_sfn_state_machine.saga_orchestrator.arn
-#   target_id      = "saga-orchestrator-state-machine"
-#   role_arn       = aws_iam_role.eventbridge_to_sfn.arn
-# }
 
 # EventBridge to SQS permissions
 resource "aws_sqs_queue_policy" "allow_eventbridge_to_os_service" {

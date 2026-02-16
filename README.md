@@ -61,7 +61,6 @@ Consumer Services (poll SQS)
 | `route-to-os-service` | `detail-type: ["BudgetGenerated", "PaymentCompleted", "ExecutionCompleted"]` | os-service-events queue |
 | `route-to-billing-service` | `detail-type: ["OrderCreated", "ExecutionCompleted"]` | billing-service-events queue |
 | `route-to-execution-service` | `detail-type: ["PaymentCompleted"]` | execution-service-events queue |
-| `route-to-saga-orchestrator` | `detail-type: ["*Approved", "*Failed", "*Completed"]` | Step Functions |
 
 ## Prerequisites
 
@@ -252,7 +251,6 @@ GitHub Actions workflow automatically:
 - [os-service](../os-service) - Service Order microservice
 - [billing-service](../billing-service) - Billing & Payment microservice
 - [execution-service](../execution-service) - Execution management microservice
-- [saga-orchestrator-service](../saga-orchestrator-service) - Saga coordination
 
 ## License
 

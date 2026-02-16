@@ -8,12 +8,12 @@ terraform {
     }
   }
 
+  # Backend S3 - bucket configured dynamically via terraform init -backend-config
   backend "s3" {
-    bucket         = "fiap-tech-challenge-tf-state-118735037876"
     key            = "messaging-infra/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "fiap-terraform-locks"
     encrypt        = true
+    dynamodb_table = "fiap-terraform-locks"
   }
 }
 

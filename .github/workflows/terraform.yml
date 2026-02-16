@@ -3,8 +3,38 @@ name: Terraform CI/CD
 on:
   push:
     branches: [main, develop]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
   pull_request:
     branches: [main, develop]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 env:
   AWS_REGION: us-east-1
@@ -36,8 +66,11 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-  terraform-plan:
-    name: Terraform Plan
+  # ---------------------------------------------------------------------------
+  # Plan for PR
+  # ---------------------------------------------------------------------------
+  plan-pr:
+    name: Terraform Plan (PR)
     runs-on: ubuntu-latest
     needs: terraform-validate
     if: github.event_name == 'pull_request'
@@ -62,33 +95,55 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=fiap-tech-challenge-tf-state-${{ steps.account.outputs.account_id }}"
+
+      - name: Determine Environment
+        id: env
+        run: |
+          if [[ "${{ github.base_ref }}" == "main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select ${{ steps.env.outputs.environment }} || terraform workspace new ${{ steps.env.outputs.environment }}
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -var="environment=development"
+        run: |
+          terraform plan -var="environment=${{ steps.env.outputs.environment }}" -no-color 2>&1 | tee plan_output.txt
         continue-on-error: true
 
-      - name: Comment Plan on PR
+      - name: Comment PR with Plan
         uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        env:
-          PLAN: "${{ steps.plan.outputs.stdout }}"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const output = `#### Terraform Plan 📖
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('terraform/plan_output.txt', 'utf8');
+
+            const output = `#### Terraform Plan for \`${{ steps.env.outputs.environment }}\` Messaging Infrastructure 📖
 
             <details><summary>Show Plan</summary>
 
             \`\`\`terraform
-            ${process.env.PLAN}
+            ${planOutput.slice(0, 65000)}
             \`\`\`
 
             </details>
 
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -97,13 +152,14 @@ jobs:
               body: output
             })
 
-  terraform-apply:
-    name: Terraform Apply
+  # ---------------------------------------------------------------------------
+  # Plan (manual trigger only)
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Terraform Plan (Manual)
     runs-on: ubuntu-latest
     needs: terraform-validate
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan'
     defaults:
       run:
         working-directory: terraform
@@ -125,29 +181,188 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=fiap-tech-challenge-tf-state-${{ steps.account.outputs.account_id }}"
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select ${{ github.event.inputs.environment }} || terraform workspace new ${{ github.event.inputs.environment }}
 
       - name: Terraform Plan
+        run: terraform plan -var="environment=${{ github.event.inputs.environment }}"
+
+  # ---------------------------------------------------------------------------
+  # Deploy Development (push to develop OR manual trigger)
+  # ---------------------------------------------------------------------------
+  deploy-development:
+    name: Deploy Development
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development' && github.event.inputs.action == 'apply')
+    environment: development
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Get AWS Account ID
+        id: account
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            terraform plan -var="environment=production" -out=tfplan
-          else
-            terraform plan -var="environment=development" -out=tfplan
-          fi
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=fiap-tech-challenge-tf-state-${{ steps.account.outputs.account_id }}"
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select development || terraform workspace new development
+
+      - name: Terraform Plan
+        run: terraform plan -var="environment=development" -out=tfplan
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
-      - name: Terraform Output
-        id: output
-        run: terraform output -json
-
       - name: Display Outputs
         run: |
-          echo "✅ Messaging infrastructure deployed successfully!"
+          echo "Development messaging infrastructure deployed!"
           echo ""
           echo "EventBridge Bus: $(terraform output -raw event_bus_name)"
           echo "OS Service Queue: $(terraform output -raw os_service_queue_url)"
           echo "Billing Service Queue: $(terraform output -raw billing_service_queue_url)"
           echo "Execution Service Queue: $(terraform output -raw execution_service_queue_url)"
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && github.event.inputs.action == 'apply')
+    environment: production
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=fiap-tech-challenge-tf-state-${{ steps.account.outputs.account_id }}"
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select production || terraform workspace new production
+
+      - name: Terraform Plan
+        run: terraform plan -var="environment=production" -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Display Outputs
+        run: |
+          echo "Production messaging infrastructure deployed!"
+          echo ""
+          echo "EventBridge Bus: $(terraform output -raw event_bus_name)"
+          echo "OS Service Queue: $(terraform output -raw os_service_queue_url)"
+          echo "Billing Service Queue: $(terraform output -raw billing_service_queue_url)"
+          echo "Execution Service Queue: $(terraform output -raw execution_service_queue_url)"
+
+  # ---------------------------------------------------------------------------
+  # Destroy (manual trigger only)
+  # ---------------------------------------------------------------------------
+  destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment: ${{ github.event.inputs.environment }}
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Get AWS Account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=fiap-tech-challenge-tf-state-${{ steps.account.outputs.account_id }}"
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select ${{ github.event.inputs.environment }} || terraform workspace new ${{ github.event.inputs.environment }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -var="environment=${{ github.event.inputs.environment }}" -auto-approve

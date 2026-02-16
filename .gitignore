@@ -1,66 +1,45 @@
-# Terraform
-**/.terraform/*
-*.tfstate
-*.tfstate.*
-*.tfvars
+
 !terraform.tfvars.example
-crash.log
-crash.*.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraformrc
-terraform.rc
-
-# Local .terraform directories
-**/.terraform/*
-
 # .tfstate files
+# Claude Code guidance file
+# Crash log files
+# Environment
+# Exclude all .tfvars files, which are likely to contain sensitive data
+# IDE
+# Ignore CLI configuration files
+# Ignore override files as they are usually used to override resources locally
+# Local .terraform directories
+# Lock files
+# Logs
+# Node modules (if any scripts use Node.js)
+# OS
+# Terraform
+# Terraform plan files
+**/.terraform/*
+*.log
+*.swo
+*.swp
+*.tfplan
 *.tfstate
 *.tfstate.*
-
-# Crash log files
-crash.log
-
-# Exclude all .tfvars files, which are likely to contain sensitive data
 *.tfvars
-!terraform.tfvars.example
-
-# Ignore override files as they are usually used to override resources locally
-override.tf
-override.tf.json
 *_override.tf
 *_override.tf.json
-
-# Ignore CLI configuration files
-.terraformrc
-terraform.rc
-
-# Lock files
-.terraform.lock.hcl
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
 *~
-
-# Logs
-*.log
-
-# Environment
+.DS_Store
 .env
-.env.local
 .env.*.local
-
-# Node modules (if any scripts use Node.js)
-node_modules/
-
-# Claude Code guidance file
+.env.local
+.idea/
+.terraform.lock.hcl
+.terraformrc
+.vscode/
 CLAUDE.md
+Thumbs.db
+crash.*.log
+crash.log
+node_modules/
+override.tf
+override.tf.json
+terraform.rc
+tfplan

@@ -6,7 +6,7 @@ aws_region = "us-east-1"
 
 # Project Configuration
 project_name = "fiap-tech-challenge"
-environment  = "development" # or "staging" or "production"
+environment  = "development" # or "production"
 
 # SQS Configuration
 message_retention_seconds  = 345600 # 4 days
